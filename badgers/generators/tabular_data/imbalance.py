@@ -132,6 +132,74 @@ class RandomSamplingClassesGenerator(ImbalanceGenerator):
 
         return Xt, yt
 
+class RandomUniqueBinaryClassesGenerator(ImbalanceGenerator):
+    """
+    Randomly samples data points within predefined classes but does not create duplicates.
+    """
+
+    def __init__(self, random_generator=default_rng(seed=0), ):
+        """
+        Initialize the RandomSamplingClassesGenerator with a specified random number generator.
+
+        :param random_generator: A NumPy random number generator used to generate random numbers.
+                                 Defaults to a default random number generator seeded with 0.
+        :type random_generator: numpy.random.Generator
+        """
+        super().__init__(random_generator=random_generator)
+        self.transformed_labels_ = None
+
+    @preprocess_inputs
+    def generate(self, X, y, proportion_classes: dict = None):
+        """
+        Randomly samples instances for each class based on the specified proportions.
+
+        :param X: Input features, can be a pandas DataFrame or a numpy array.
+        :type X: Union[pandas.DataFrame, numpy.ndarray]
+        :param y: Target variable, must be a pandas Series or a numpy array.
+        :type y: Union[pandas.Series, numpy.ndarray]
+        :param proportion_classes: A dictionary specifying the desired proportion of each class.
+                                   The keys are class labels and the values are the desired proportions.
+                                   For example, to have 80% of class 'A', 20% of class 'B',
+                                   use `proportion_classes={'A': 0.8, 'B': 0.2}`.
+        :type proportion_classes: dict, optional
+        :return: A tuple containing the sampled features (Xt) and the corresponding target values (yt).
+        :rtype: Tuple[Union[pandas.DataFrame, numpy.ndarray], Union[pandas.Series, numpy.ndarray]]
+        """
+        # local variables
+        Xt = []
+        transformed_labels = []
+
+        classOne = []
+        classTwo = []
+        for label, prop in proportion_classes.items():
+            if empty(classOne):
+                classOne = [prop, int(prop * X.shape[0]), X[y == label].shape[0]]
+            else:
+                classTwo = [prop, int(prop * X.shape[0]), X[y == label].shape[0]]
+
+        if classOne[2] == 0 or classTwo[2] == 0:
+            raise ValueError("One of the classes has no instances in the dataset. "
+                             "Please ensure that both classes have sufficient data.")
+        
+        if classOne[1] > classOne[2]:
+            classTwo[1] = int(classOne[2] / classOne[0] * classTwo[0])
+        elif classTwo[1] > classTwo[2]:
+            classOne[1] = int(classTwo[2] / classTwo[0] * classOne[0])
+
+        for label, size in classTwo.items():
+            if size == 0:
+                continue
+            Xt.append(self.random_generator.choice(X[y == label], size=size, replace=False))
+            transformed_labels += [label] * size
+
+        Xt = pd.DataFrame(
+            data=np.vstack(Xt),
+            columns=X.columns
+        )
+
+        yt = pd.Series(data=transformed_labels)
+
+        return Xt, yt
 
 class RandomSamplingTargetsGenerator(ImbalanceGenerator):
     """
