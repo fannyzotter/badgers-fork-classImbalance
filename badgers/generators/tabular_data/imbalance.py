@@ -169,26 +169,26 @@ class RandomUniqueBinaryClassesGenerator(ImbalanceGenerator):
         Xt = []
         transformed_labels = []
 
-        classOne = []
-        classTwo = []
-        for label, prop in proportion_classes.items():
-            if empty(classOne):
-                classOne = [prop, int(prop * X.shape[0]), X[y == label].shape[0]]
-            else:
-                classTwo = [prop, int(prop * X.shape[0]), X[y == label].shape[0]]
-
-        if classOne[2] == 0 or classTwo[2] == 0:
-            raise ValueError("One of the classes has no instances in the dataset. "
-                             "Please ensure that both classes have sufficient data.")
+        shape = X.shape[0]
+        size_classes = {}
+        class_counts = {label: X[y == label].shape[0] for label in proportion_classes.keys()}
+        print("class_counts", class_counts)
+        check_size = False
         
-        if classOne[1] > classOne[2]:
-            classTwo[1] = int(classOne[2] / classOne[0] * classTwo[0])
-        elif classTwo[1] > classTwo[2]:
-            classOne[1] = int(classTwo[2] / classTwo[0] * classOne[0])
+        while not check_size:
+            size_classes = {label: int(prop * shape) for label, prop in proportion_classes.items()}
+            print("size_classes", size_classes)
+            num_classes = len(size_classes)
+            for label, size in size_classes.items():
+                if size > class_counts[label]:
+                    shape = class_counts[label] / proportion_classes[label]
+                    check_size = False
+                else:
+                    num_classes -= 1
+            if num_classes == 0:
+                check_size = True
 
-        for label, size in classTwo.items():
-            if size == 0:
-                continue
+        for label, size in size_classes.items():
             Xt.append(self.random_generator.choice(X[y == label], size=size, replace=False))
             transformed_labels += [label] * size
 
@@ -199,6 +199,7 @@ class RandomUniqueBinaryClassesGenerator(ImbalanceGenerator):
 
         yt = pd.Series(data=transformed_labels)
 
+        return Xt, yt
         return Xt, yt
 
 class RandomSamplingTargetsGenerator(ImbalanceGenerator):
